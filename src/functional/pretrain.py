@@ -104,6 +104,7 @@ def graph_cl_pretrain(
     dynamic_edge,
     split_method,   #   默认Random_walk。用随机游走的方式构造  诱导子图
     ):
+#############################   目前学习到了这里
     
     @param('pretrain.batch_size')
     def get_loaders(data, batch_size):
@@ -166,7 +167,7 @@ def graph_cl_pretrain(
             reconstruction_features = self.decoder(hidden_features)
             return self.loss_fn(input_features, reconstruction_features)
 
-#############################   目前学习到了这里
+
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')   
     #   初始化包括了 2层 MLP
     loss_fn = ContrastiveLoss(model.backbone.hidden_dim).to(device)
