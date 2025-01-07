@@ -7,12 +7,12 @@ class FAGCN(torch.nn.Module):
     def __init__(self, num_features, hidden, num_conv_layers, dropout, epsilon):
         super(FAGCN, self).__init__()
         self.global_pool = global_add_pool
-        self.eps = epsilon
-        self.layer_num = num_conv_layers
-        self.dropout = dropout
-        self.hidden_dim = hidden
-
-        self.layers = torch.nn.ModuleList()
+        self.eps = epsilon              #   默认epsilon  为 0.1
+        self.layer_num = num_conv_layers    #   默认  2 层
+        self.dropout = dropout          #   默认dropout 为 0.2
+        self.hidden_dim = hidden        #   默认128
+        #   self.layers包含  多层的 FAConv
+        self.layers = torch.nn.ModuleList() 
         for _ in range(self.layer_num):
             self.layers.append(FAConv(hidden, epsilon, dropout))
 

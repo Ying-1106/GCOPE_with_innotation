@@ -11,7 +11,7 @@ from copy import deepcopy
 @param('pretrain.noise_switch')
 def run(
     save_dir,
-    dataset,
+    dataset,    #   ["cora","citeseer"]
     backbone_model,
     saliency_model,
     method,
@@ -39,24 +39,34 @@ def run(
         # load data
         from data import get_clustered_data
 
-        with torch.no_grad():
+        with torch.no_grad():   #   dataset是["cora","citeseer"]
+           
+        #   data是  若干个  诱导子图 （从大图中采样得来的）构成的列表
+        #   gco_model.learnable_param  是  所有协调器节点的向量
+        #   raw_data是  大图（包含协调器节点，和与协调器有关的边）
             data, gco_model, raw_data = get_clustered_data(dataset) 
 
         # init model
         from model import get_model
         model = get_model(
             backbone_kwargs = {
-                'name': backbone_model,
-                'num_features': data[0].x.size(-1),
+                'name': backbone_model, #   默认值：'fagcn'
+                'num_features': data[0].x.size(-1), #   统一后的特征长度：默认值 100
             },
             saliency_kwargs = {
                 'name': saliency_model,
                 'feature_dim': data[0].x.size(-1),
-            } if saliency_model != 'none' else None,
+            } if saliency_model != 'none' else None,    #   默认值是  None
         )                
-    
+        #   返回的  model.backbone就是一个2层的FAGCN层
+        #   model.forward(input)  就是让 input  经过 backbone跑一遍
+
     # train
     if method == 'graphcl':            
+        #   data： 622个诱导子图构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
+        #   model.backbone 就是一个 2层的 FAGCN
+        #   geo_model.learnable_param就是一个列表[],包含3个协调器节点向量
+        #   raw_data是大图（包含协调器节点，和与协调器相连的边）
         model = graph_cl_pretrain(data, model, gco_model, raw_data)
     elif method == 'simgrace':
         model = simgrace_pretrain(data, model, gco_model, raw_data)
@@ -68,6 +78,10 @@ def run(
 
     torch.save(model.state_dict(), os.path.join(save_dir, ','.join(dataset)+'_pretrained_model.pt'))
 
+
+
+#################################################
+    
 @param('pretrain.learning_rate')
 @param('pretrain.weight_decay')
 @param('pretrain.epoch')
@@ -77,18 +91,18 @@ def run(
 @param('pretrain.split_method')
 @param('pretrain.dynamic_edge')
 def graph_cl_pretrain(
-    data,
-    model,
-    gco_model,
+    data,   #   data： 622个诱导子图构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
+    model,  #   model.backbone 就是一个 2层的 FAGCN
+    gco_model,#     geo_model.learnable_param就是一个列表[],包含3个协调器节点向量
     raw_data,
     learning_rate,
     weight_decay,
-    epoch,
-    cross_link,
-    cl_init_method,
-    reconstruct,
+    epoch,  #   默认100
+    cross_link, #   默认 1。每个原始图  有一个协调器，  协调器和原始图节点、协调器之间  都有边
+    cl_init_method, #   默认 "learnable"，意思是用nn.Parameter初始化一个随机的长为100的向量作为协调器节点
+    reconstruct,    #   默认 0.2
     dynamic_edge,
-    split_method,
+    split_method,   #   默认Random_walk。用随机游走的方式构造  诱导子图
     ):
     
     @param('pretrain.batch_size')
@@ -152,8 +166,9 @@ def graph_cl_pretrain(
             reconstruction_features = self.decoder(hidden_features)
             return self.loss_fn(input_features, reconstruction_features)
 
+#############################   目前学习到了这里
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')   
-    
+    #   初始化包括了 2层 MLP
     loss_fn = ContrastiveLoss(model.backbone.hidden_dim).to(device)
     loss_fn.train(), model.to(device).train()
     best_loss = 100000.
@@ -245,6 +260,14 @@ def graph_cl_pretrain(
         pbar.close()
         
     return best_model
+
+
+
+
+
+
+
+##########################################################
 
 @param('pretrain.learning_rate')
 @param('pretrain.weight_decay')

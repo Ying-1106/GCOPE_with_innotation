@@ -25,6 +25,7 @@ for target_dataset in "${target_datasets[@]}"; do
 
     python src/exec.py --config-file pretrain.json --general.save_dir "storage/${backbone}/reconstruct" --general.reconstruct 0.2 --data.name "${source_dataset_str}" --pretrain.split_method ${split_method} --model.backbone.model_type ${backbone}
     
+    
     for lr in "${learning_rates[@]}"
     do
         for bs in "${batch_sizes[@]}"

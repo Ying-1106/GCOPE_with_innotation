@@ -28,10 +28,10 @@ def x_svd(data, out_dim):
 
 @param('general.cache_dir')
 def iterate_datasets(data_names, cache_dir):
-    
+    #   dataset是["cora","citeseer"]
     if isinstance(data_names, str):
         data_names = [data_names]
-    
+    #   dataset是["cora","citeseer"]
     for data_name in data_names:
         if data_name in ['cora', 'citeseer', 'pubmed']:
             data = Planetoid(root=cache_dir, name=data_name.capitalize())._data
@@ -47,7 +47,10 @@ def iterate_datasets(data_names, cache_dir):
             raise ValueError(f'Unknown dataset: {data_name}')
         
         assert isinstance(data, (Data, dict)), f'Unknown data type: {type(data)}'
-
+        #   yield 作用：例如generator_01 = iterate_datasets(data_names)。    会返回一个generator（一种特殊的迭代器iterator），其中包含多个成员，每个data就是一个成员。  
+        #   每次调用yield就会产生一个data。  每次generator.__next__()方法就会  调用yield（产生）  并  返回一个成员。
+        #   或者 for _ in generator：  这样每次循环访问的一个  _ ，效果就是调用yield  ，产生下一个成员，然后把这个成员返回。
+        #   也可以用 list(generator)  把迭代器变成列表，这样可以用list[0]这样按下标访问。
         yield data if isinstance(data, Data) else Data(**data)
 
 @param('general.cache_dir')
@@ -74,10 +77,13 @@ def iterate_dataset_feature_tokens(data_names, cache_dir):
 
         yield data if isinstance(data, Data) else Data(**data)
 
+
+
 # including projection operation, SVD
 @param('data.node_feature_dim')
 def preprocess(data, node_feature_dim):
-
+    
+    #   删除train_mask等，因为预训练不需要label，自然也就不需要用train_mask来划分训练节点等，预训练是自监督
     if hasattr(data, 'train_mask'):
         del data.train_mask
     if hasattr(data, 'val_mask'):
@@ -89,7 +95,7 @@ def preprocess(data, node_feature_dim):
         edge_index_with_loops = add_self_loops(data.edge_index, num_nodes=data.num_nodes)[0]
         data.x = degree(edge_index_with_loops[1]).reshape((-1,1))
     
-    else:
+    else:   #   把节点特征长度  统一到 node_feature_dim （默认值100）
         # import pdb
         # pdb.set_trace()        
         if data.x.size(-1) > node_feature_dim:
