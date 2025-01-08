@@ -11,7 +11,7 @@ from copy import deepcopy
 @param('pretrain.noise_switch')
 def run(
     save_dir,
-    dataset,    #   ["cora","citeseer"]
+    dataset,    #   ["cora","citeseer","cornell"]
     backbone_model,
     saliency_model,
     method,
@@ -104,7 +104,7 @@ def graph_cl_pretrain(
     dynamic_edge,
     split_method,   #   默认Random_walk。用随机游走的方式构造  诱导子图
     ):
-#############################   目前学习到了这里
+
     
     @param('pretrain.batch_size')
     def get_loaders(data, batch_size):
@@ -134,6 +134,7 @@ def graph_cl_pretrain(
     class ContrastiveLoss(torch.nn.Module):
         def __init__(self, hidden_dim, temperature=0.5):
             super(ContrastiveLoss, self).__init__()
+            #   对比任务头，包含2层 MLP
             self.head = torch.nn.Sequential(
                 torch.nn.Linear(hidden_dim, hidden_dim),
                 torch.nn.ReLU(inplace=True),
@@ -155,7 +156,8 @@ def graph_cl_pretrain(
     class ReconstructionLoss(torch.nn.Module):
         def __init__(self, hidden_dim, feature_num):
             super(ReconstructionLoss, self).__init__()
-            self.decoder = torch.nn.Sequential(
+            #   2层MLP
+            self.decoder = torch.nn.Sequential(#   hidden_dim == 128 。 feature_dim == 100
                 torch.nn.Linear(hidden_dim, hidden_dim),
                 torch.nn.ReLU(inplace=True),
                 torch.nn.Linear(hidden_dim, feature_num),
@@ -170,6 +172,7 @@ def graph_cl_pretrain(
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')   
     #   初始化包括了 2层 MLP
+    #   model.backbone.hidden_dim == 128  。
     loss_fn = ContrastiveLoss(model.backbone.hidden_dim).to(device)
     loss_fn.train(), model.to(device).train()
     best_loss = 100000.
@@ -196,15 +199,18 @@ def graph_cl_pretrain(
                 lr=learning_rate,
                 weight_decay=weight_decay
                 )
-        else:
+        else:   # here.  rec_loss_fn  包含 2层 MLP
             rec_loss_fn = ReconstructionLoss(model.backbone.hidden_dim, data[0].num_node_features).to(device)
             rec_loss_fn.train()
             optimizer = torch.optim.Adam(
-                filter(lambda p: p.requires_grad, list(gco_model.parameters()) + list(model.parameters()) + list(loss_fn.parameters()) +list(rec_loss_fn.parameters())),
+                filter(lambda p: p.requires_grad, list(gco_model.parameters()) +    #   3个协调器向量
+                        list(model.parameters()) +  #   model.backbone(2层FAGCN)的参数
+                        list(loss_fn.parameters()) +    #   2层MLP
+                        list(rec_loss_fn.parameters())),    # 2层MLP
                 lr=learning_rate,
                 weight_decay=weight_decay
                 )            
-
+###################################目前学到了这里
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch)
 
     from torchmetrics import MeanMetric

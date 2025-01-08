@@ -11,7 +11,7 @@ batch_sizes=(100)
 
 for target_dataset in "${target_datasets[@]}"; do
     source_dataset_str=""
-    datasets=("wisconsin" "texas" "cornell" "chameleon" "squirrel" "cora" "citeseer" "pubmed" "computers" "photo")
+    datasets=( "cornell"  "cora" "citeseer" )
     for dataset in "${datasets[@]}"; do
         if [ "$dataset" != "$target_dataset" ]; then
             source_dataset_str+="${dataset},"
@@ -23,7 +23,7 @@ for target_dataset in "${target_datasets[@]}"; do
     echo $target_dataset
     echo "storage/reconstruct/${source_dataset_str}_pretrained_model.pt"    
 
-    python src/exec.py --config-file pretrain.json --general.save_dir "storage/${backbone}/reconstruct" --general.reconstruct 0.2 --data.name "${source_dataset_str}" --pretrain.split_method ${split_method} --model.backbone.model_type ${backbone}
+    python src/exec.py --config-file pretrain.json --general.save_dir "storage/fagcn/reconstruct" --general.reconstruct 0.2 --data.name "cora,citeseer,cornell" --pretrain.split_method RandomWalk --model.backbone.model_type fagcn
     
     
     for lr in "${learning_rates[@]}"

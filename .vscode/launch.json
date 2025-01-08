@@ -1,0 +1,28 @@
+
+
+
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Python: exec.py with different target datasets",
+        "type": "python",
+        "request": "launch",
+        "program": "C:\\Users\\Administrator\\Desktop\\GCOPE_with_innotation\\src\\exec.py",
+        "args": [
+          "--config-file", "C:\\Users\\Administrator\\Desktop\\GCOPE_with_innotation\\pretrain.json",
+
+          "--general.save_dir", "storage/fagcn/reconstruct",
+          "--general.reconstruct", "0.2",
+
+          "--data.name", "cora,citeseer,cornell",
+          "--pretrain.split_method", "RandomWalk",
+          
+          "--model.backbone.model_type", "fagcn"
+        ],
+        "console": "integratedTerminal",
+        "justMyCode": false
+      }
+    ]
+  }
+  

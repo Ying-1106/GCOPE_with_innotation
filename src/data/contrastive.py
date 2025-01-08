@@ -94,7 +94,8 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
         elif(cl_init_method == 'learnable'):
             from model.graph_coordinator import GraphCoordinator     
 
-            #   定义协调器节点的初始化向量，geo_model.learnable_param就是一个列表[]， 包含了 k个 长度为100的 向量（k个原始小图，每个图有一个长度为100的协调器节点）     
+            #   定义协调器节点的初始化向量，geo_model.learnable_param就是一个列表[]， 包含了 k个长度为100的 一维向量(nn.Parameter)
+            #   k个原始小图，每个图有一个长度为100的协调器节点
             gco_model = GraphCoordinator(data.num_node_features,len(new_index_list))
 
             #   data是一个 Pyg.Batch（大图）， data.x包含了2个小图的全部节点特征。
