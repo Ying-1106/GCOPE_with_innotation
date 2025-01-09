@@ -109,26 +109,44 @@ def graph_cl_pretrain(
     
     @param('pretrain.batch_size')
     def get_loaders(data, batch_size):
-
+        #       data： 622个诱导子图构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
         import random
         from torch_geometric.data import Data
         from torch_geometric.loader import DataLoader
         from algorithm.graph_augment import graph_views
-
+                                #       删除节点， 边扰动  ，属性屏蔽。三者选2个，作为增强策略组合
         augs, aug_ratio = random.choices(['dropN', 'permE', 'maskN'], k=2), random.randint(1, 3) * 1.0 / 10
-
+        #   例如，augs == [删除节点，边扰动]  ，aug_ratio == 0.2 
         view_list_1 = []
         view_list_2 = []
         for g in data:
+            #   g  是  1个  诱导子图。
+
+            #   用augs[0]（即第一种增强方式 ：删除节点） 来构造一个增强后视图
+            #   例如 g 原来是 23个节点特征，72条边  。增强之后得到的view_g包含19个节点（删除20%的节点），58条边（删除与这些节点相连的边）
             view_g = graph_views(data=g, aug=augs[0], aug_ratio=aug_ratio)
+            #   Pyg.Data代表一个同质图。给出节点特征(节点数 * 特征长度)  +  边 （2*边数） ，就能代表一个同质图
             view_list_1.append(Data(x=view_g.x, edge_index=view_g.edge_index))
+
+            #   用augs[1]（即第二种增强方式 ，边扰动） 来构造一个增强后视图
+            #   这里的 g 其实是 已经删除部分节点之后 的图（增强过的图）
             view_g = graph_views(data=g, aug=augs[1], aug_ratio=aug_ratio)
             view_list_2.append(Data(x=view_g.x, edge_index=view_g.edge_index))
-
+        #   包含622个  删节点增强后  的视图，每次取10个
         loader1 = DataLoader(view_list_1, batch_size=batch_size, shuffle=False,
                                 num_workers=4)  
+        #   包含622个  删除边增强后  的视图，每次取10个。和上面的loader1  一一对应。
         loader2 = DataLoader(view_list_2, batch_size=batch_size, shuffle=False,
                                 num_workers=4)  
+
+#   测试代码
+        # for graph_ in loader1:
+        #     #   经过测试得出，loader_1用for循环迭代一次，取出的成员是  10个图组成的一个DataBatch
+        #     pass
+
+        # for graph_ in loader2:
+
+        #     pass
 
         return loader1, loader2
 
@@ -211,12 +229,12 @@ def graph_cl_pretrain(
                 lr=learning_rate,
                 weight_decay=weight_decay
                 )            
-###################################目前学到了这里
+
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch)
 
     from torchmetrics import MeanMetric
-    from tqdm import tqdm
-    from data.contrastive import update_graph_list_param
+    from tqdm import tqdm   #   用于打印进度条
+    from data.contrastive import update_graph_list_param    
     loss_metric = MeanMetric()
 
     for e in range(epoch):
@@ -225,18 +243,19 @@ def graph_cl_pretrain(
 
         if(cross_link > 0 and cl_init_method == 'learnable'):
             if(split_method=='RandomWalk'):
-                last_updated_data = deepcopy(data)
+                last_updated_data = deepcopy(data)  #   data： 622个诱导子图构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
 
-            loaders = get_loaders(data)
+            loaders = get_loaders(data) #   data： 622个诱导子图构成的列表
         elif(e==0):
             loaders = get_loaders(data)
 
         pbar = tqdm(zip(*loaders), total=len(loaders[0]), ncols=100, desc=f'Epoch {e}, Loss: inf')
                 
         for batch1, batch2 in pbar:
-
+            #   batch1包含10个  删节点增强后的图，batch2包含10个  删除边增强后的图
+            ###################################################目前学到了这里
             if(gco_model!=None):
-                batch1 = gco_model(batch1)
+                batch1 = gco_model(batch1)  #   一个batch1包含10个图，batch1.batch取值为0~9，标明了属于10张图中的哪一个
                 batch2 = gco_model(batch2)    
 
             optimizer.zero_grad()

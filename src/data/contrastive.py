@@ -105,7 +105,7 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
             #   处理后的  data.x  是  16462*100的节点特征。（所有 原始小图 节点特征 + k个协调器节点特征）
       
 #       原来的data.batch是一个 [0,0,......,1,1.....]。16460个元素，前2708个是0（表示cora的节点），后13752个是1（表示computers的节点）
-      
+        #   这里的data.batch 指明了节点属于哪个原始图。0表示cora，1表示citeseer,2表示cornell
         data.batch = torch.cat([data.batch, torch.tensor([new_index_list]).squeeze(0)], dim=0)
         #   处理之后的data.batch在最后加了个[0,1]，代表cora图的协调器节点和 computers图的协调器节点
 

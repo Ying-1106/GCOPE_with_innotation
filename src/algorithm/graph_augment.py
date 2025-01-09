@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-
+#   data是一个 pyg格式的图，对它做删除部分节点的操作
 def drop_nodes(data, aug_ratio):
     node_num, _ = data.x.size()
     _, edge_num = data.edge_index.size()
@@ -26,18 +26,18 @@ def drop_nodes(data, aug_ratio):
 
     return data
 
-
+    #   data  是 一个图。这个是边扰动的增强策略，根据代码来看，就是随机删除  20%  的边
 def permute_edges(data, aug_ratio):
     """
     only change edge_index, all the other keys unchanged and consistent
     """
-    _, edge_num = data.edge_index.size()
-    permute_num = int(edge_num * aug_ratio)
+    _, edge_num = data.edge_index.size()    #   图data  中  边的总数（例如58）
+    permute_num = int(edge_num * aug_ratio) #   需要删除的边的数量（例如11）
 
     idx_delete = np.random.choice(edge_num, (edge_num - permute_num), replace=False)
     data.edge_index = data.edge_index[:, idx_delete]
 
-    return data
+    return data     #   删除一部分边之后，还剩47条边
 
 
 def mask_nodes(data, aug_ratio):
