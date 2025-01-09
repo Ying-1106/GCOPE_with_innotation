@@ -2,6 +2,7 @@ from fastargs.decorators import param
 import numpy as np
 import torch
 from copy import deepcopy
+import os
 
 @param('general.save_dir')
 @param('data.name', 'dataset')
