@@ -45,7 +45,7 @@ def run(
         #   data是  若干个  诱导子图 （从大图中采样得来的）构成的列表
         #   gco_model.learnable_param  是  所有协调器节点的向量
         #   raw_data是  大图（包含协调器节点，和与协调器有关的边）
-            data, gco_model, raw_data = get_clustered_data(dataset) 
+            data, gco_model, raw_data = get_clustered_data(dataset)  #   raw_data.x包含6221个节点向量，最后3个向量  和 gco_model.learnable_param是相同的。都是代表3个协调器向量
 
         # init model
         from model import get_model

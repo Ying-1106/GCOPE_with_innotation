@@ -27,8 +27,11 @@ class GraphCoordinator(nn.Module):
         for graph_index in graph_index_list:
             node_indices_corresponding_graph = (batch_with_no_grad_node_features.batch == graph_index).nonzero(as_tuple=False).view(-1)
             for node_indice in reversed(node_indices_corresponding_graph):
+
+                #   self.last_updated_param  是  3个  长为100 的协调器向量
                 for index, param_value in enumerate(self.last_updated_param):
                     if(torch.equal(batch_with_no_grad_node_features.x[node_indice], param_value)):
+                        #   如果当前这个  向量  
                         batch_with_no_grad_node_features.x[node_indice] = self.learnable_param[index]
                         count+=1
         batch_with_learnable_param = batch_with_no_grad_node_features

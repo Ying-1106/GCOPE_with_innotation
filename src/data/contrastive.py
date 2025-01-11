@@ -96,18 +96,26 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
 
             #   定义协调器节点的初始化向量，geo_model.learnable_param就是一个列表[]， 包含了 k个长度为100的 一维向量(nn.Parameter)
             #   k个原始小图，每个图有一个长度为100的协调器节点
+            #   因为设置了seed，所以每次跑代码，生成的协调器向量初始值都是一样的
             gco_model = GraphCoordinator(data.num_node_features,len(new_index_list))
 
             #   data是一个 Pyg.Batch（大图）， data.x包含了2个小图的全部节点特征。
             #   把2个协调器节点特征 加入到 原有的data.x当中。
             
             data.x = gco_model.add_learnable_features_with_no_grad(data.x)
-            #   处理后的  data.x  是  16462*100的节点特征。（所有 原始小图 节点特征 + k个协调器节点特征）
+            #   处理后的  data.x  是  6221 * 100的 节点特征。（所有 原始小图 节点特征 + k个协调器节点特征）
+            #   Cora,Citeseer,Corenell三个原始图  节点总数加起来  6218. （不包含协调器），加上3个协调器共有6221个节点
       
-#       原来的data.batch是一个 [0,0,......,1,1.....]。16460个元素，前2708个是0（表示cora的节点），后13752个是1（表示computers的节点）
-        #   这里的data.batch 指明了节点属于哪个原始图。0表示cora，1表示citeseer,2表示cornell
+
+
+        #   原来的data.batch是一个 [0,0,......,1,1.....,2,2]。6218个元素，
+        #   前2708个是0（表示cora的节点），后3327个是1（表示computers的节点），最后183个是2
+        #   这里的data.batch 指明了节点属于哪个原始图。0表示cora。  1表示citeseer,    2表示cornell
+        #   可以得出结论，pyg中的data.batch用来指示 每一个节点属于哪一个图。这段代码用来表示节点 属于（cora,citeseer,cornell)哪一个图
+        #   之后pretrain代码中，用data.batch来表示  每一个节点属于  一个batch中10个图  中的那一个
+        
         data.batch = torch.cat([data.batch, torch.tensor([new_index_list]).squeeze(0)], dim=0)
-        #   处理之后的data.batch在最后加了个[0,1]，代表cora图的协调器节点和 computers图的协调器节点
+        #   处理之后的data.batch在最后加了个[0,1,2]，代表： cora图的协调器节点， citeseer图的协调器节点,cornell图的协调器节点
 
 
         
@@ -231,7 +239,10 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
 
 #   此时的 data是 1个大图：包含cora,citeseer,cornell三个小图。  一共6221个节点（包含3个协调器），32398条边（包括原始边、协调器和原始图节点的边、协调器之间的边）
 ###############         上面有个问题，那就是为什么最后一个协调器不向其他协调器发射边
-##################################################################################################################
+    
+
+
+#########################
     if(split_method=='RandomWalk'):
         from torch_cluster import random_walk
         split_ratio = 0.1   #   大图节点总数 中  选择 10 %  的节点
@@ -260,7 +271,7 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
         #   graph_list是  若干个  诱导子图
         #   gco_model.learnable_param就是  所有协调器节点的向量
         #   raw_data是  大图（包含协调器节点，和与协调器有关的边）
-        return graph_list, gco_model, raw_data
+        return graph_list, gco_model, raw_data  #   raw_data.x包含6221个节点向量，最后3个向量  和 gco_model.learnable_param是相同的。都是代表3个协调器向量
 
 def update_graph_list_param(graph_list, gco_model):
     
