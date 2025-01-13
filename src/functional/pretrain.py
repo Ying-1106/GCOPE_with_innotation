@@ -44,7 +44,7 @@ def run(
            
         #   data是  若干个  诱导子图 （从大图中采样得来的）构成的列表
         #   gco_model.learnable_param  是  所有协调器节点的向量
-        #   raw_data是  大图（包含协调器节点，和与协调器有关的边）
+        #   raw_data是  大图（包含协调器节点，和与协调器有关的边）。 raw_data.x[-3（或者-2,-1）]就是最后3个节点向量，也就是3个协调器向量
             data, gco_model, raw_data = get_clustered_data(dataset)  #   raw_data.x包含6221个节点向量，最后3个向量  和 gco_model.learnable_param是相同的。都是代表3个协调器向量
 
         # init model
@@ -132,7 +132,7 @@ def graph_cl_pretrain(
             #   这里的 g 其实是 已经删除部分节点之后 的图（增强过的图）
             view_g = graph_views(data=g, aug=augs[1], aug_ratio=aug_ratio)
             view_list_2.append(Data(x=view_g.x, edge_index=view_g.edge_index))
-        #   包含622个  删节点增强后  的视图，每次取10个
+        #   包含622个  删节点增强后  的视图，每次取10个，组成一个batch
         loader1 = DataLoader(view_list_1, batch_size=batch_size, shuffle=False,
                                 num_workers=4)  
         #   包含622个  删除边增强后  的视图，每次取10个。和上面的loader1  一一对应。
@@ -161,7 +161,7 @@ def graph_cl_pretrain(
             )
             self.temperature = temperature
 
-        def forward(self, zi, zj):
+        def forward(self, zi, zj):  #   有10个原始图，zi就是删除节点后的10个增强图，zj就是10个删除边后的增强图
             batch_size = zi.size(0)
             x1_abs = zi.norm(dim=1)
             x2_abs = zj.norm(dim=1)
@@ -253,8 +253,8 @@ def graph_cl_pretrain(
                 
         for batch1, batch2 in pbar:
             #   batch1包含10个  删节点增强后的图，batch2包含10个  删除边增强后的图
-            ###################################################目前学到了这里
-            if(gco_model!=None):
+           
+            if(gco_model!=None):    #   以下这个操作，是把batch中的协调器向量  从不可改变的固定向量  变成  可学习的向量
                 batch1 = gco_model(batch1)  #   一个batch1包含10个图，batch1.batch取值为0~9，标明了属于10张图中的哪一个
                 batch2 = gco_model(batch2)    
 
@@ -264,8 +264,9 @@ def graph_cl_pretrain(
                 zi, zj = model(batch1.to(device)), model(batch2.to(device))
                 loss = loss_fn(zi, zj)
             else:               
-                zi, hi = model(batch1.to(device))
+                zi, hi = model(batch1.to(device))   # zi是10个ReadOut操作之后的图向量，  hi是 batch1中的10个图的所有节点的  GNN聚合后的节点特征，
                 zj, hj = model(batch2.to(device))
+                ########################  目前学到了这里
                 loss = loss_fn(zi, zj) + reconstruct*(rec_loss_fn(batch1.x, hi) + rec_loss_fn(batch2.x, hj))
                 
             loss.backward()
