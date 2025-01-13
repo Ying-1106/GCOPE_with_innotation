@@ -161,15 +161,26 @@ def graph_cl_pretrain(
             )
             self.temperature = temperature
 
-        def forward(self, zi, zj):  #   有10个原始图，zi就是删除节点后的10个增强图，zj就是10个删除边后的增强图
-            batch_size = zi.size(0)
-            x1_abs = zi.norm(dim=1)
+        def forward(self, zi, zj):  #   有10个原始图，zi就是删除节点后的10个增强图的图向量，zj就是10个删除边后的增强图的图向量
+            batch_size = zi.size(0) #   10
+            x1_abs = zi.norm(dim=1) #   计算  每个图向量的  Frobenius 范数(即L2范数，就是根号下  每个向量元素的平方的和)
             x2_abs = zj.norm(dim=1)
             sim_matrix = torch.einsum('ik,jk->ij', zi, zj) / torch.einsum('i,j->ij', x1_abs, x2_abs)
             sim_matrix = torch.exp(sim_matrix / self.temperature)
+            #   得到的sim_matrix计算了  zi中每个向量  与  zj中每个向量的  余弦相似度
+            
+
+            #   这是每对正例的相似度，即zi[0]和zj[0]的相似度，zi[1]和zj[1]的相似度，zi[2]和zj[2]的相似度，.。。。。zi[9]和zj[9]的相似度，
             pos_sim = sim_matrix[range(batch_size), range(batch_size)]
+
+            ############        目前学到了这里
             loss = pos_sim / (sim_matrix.sum(dim=1) - pos_sim)
             loss = - torch.log(loss).mean()
+
+            #   测试代码
+
+
+
             return loss
 
     class ReconstructionLoss(torch.nn.Module):
