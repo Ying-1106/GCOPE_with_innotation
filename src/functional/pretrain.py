@@ -153,7 +153,7 @@ def graph_cl_pretrain(
     class ContrastiveLoss(torch.nn.Module):
         def __init__(self, hidden_dim, temperature=0.5):
             super(ContrastiveLoss, self).__init__()
-            #   对比任务头，包含2层 MLP
+            #   对比任务头，包含2层 MLP。在GraphCL中，这个head似乎没有用到
             self.head = torch.nn.Sequential(
                 torch.nn.Linear(hidden_dim, hidden_dim),
                 torch.nn.ReLU(inplace=True),
@@ -173,11 +173,11 @@ def graph_cl_pretrain(
             #   这是每对正例的相似度，即zi[0]和zj[0]的相似度，zi[1]和zj[1]的相似度，zi[2]和zj[2]的相似度，.。。。。zi[9]和zj[9]的相似度，
             pos_sim = sim_matrix[range(batch_size), range(batch_size)]
 
-            ############        目前学到了这里
-            loss = pos_sim / (sim_matrix.sum(dim=1) - pos_sim)
+            #   以zi的10个向量为中心，每个向量 都有一个对应的LOSS，一共有10个LOSS值
+            loss = pos_sim / (sim_matrix.sum(dim=1) - pos_sim)  #   分子上是1对正例相似度，分母上是9对负例的相似度
             loss = - torch.log(loss).mean()
 
-            #   测试代码
+            
 
 
 
@@ -195,8 +195,8 @@ def graph_cl_pretrain(
 
             self.loss_fn = torch.nn.MSELoss()
 
-        def forward(self, input_features, hidden_features):
-            reconstruction_features = self.decoder(hidden_features)
+        def forward(self, input_features, hidden_features): #   input_features是原始节点特征（长度100），hidden_features是GNN聚合更新后的节点特征（长度128）
+            reconstruction_features = self.decoder(hidden_features) #   GNN聚合后的节点特征（长度128）  ，再经过2层MLP（decoder），长度变换到100
             return self.loss_fn(input_features, reconstruction_features)
 
 
@@ -235,8 +235,8 @@ def graph_cl_pretrain(
             optimizer = torch.optim.Adam(
                 filter(lambda p: p.requires_grad, list(gco_model.parameters()) +    #   3个协调器向量
                         list(model.parameters()) +  #   model.backbone(2层FAGCN)的参数
-                        list(loss_fn.parameters()) +    #   2层MLP
-                        list(rec_loss_fn.parameters())),    # 2层MLP
+                        list(loss_fn.parameters()) +    #  对比LOSS的 2层MLP，GraphCL中不会用到这个head，所以这个参数不会改变
+                        list(rec_loss_fn.parameters())),    # 2层MLP，这个主要是把GNN更新后的特征（长度128）  长度还原到原始长度100，这个参数会用到。
                 lr=learning_rate,
                 weight_decay=weight_decay
                 )            
@@ -263,8 +263,8 @@ def graph_cl_pretrain(
         pbar = tqdm(zip(*loaders), total=len(loaders[0]), ncols=100, desc=f'Epoch {e}, Loss: inf')
                 
         for batch1, batch2 in pbar:
-            #   batch1包含10个  删节点增强后的图，batch2包含10个  删除边增强后的图
-           
+            #   batch1包含10个  删节点增强后的图  ，batch2包含10个  删除边增强后的图
+            #   上一个batch1，batch2 会在最后更新 协调器，下面这个操作就是把  更新后的协调器向量  赋值  给 这个batch中的协调器。（相当于让这一个batch的协调器也得到更新）
             if(gco_model!=None):    #   以下这个操作，是把batch中的协调器向量  从不可改变的固定向量  变成  可学习的向量
                 batch1 = gco_model(batch1)  #   一个batch1包含10个图，batch1.batch取值为0~9，标明了属于10张图中的哪一个
                 batch2 = gco_model(batch2)    
@@ -277,14 +277,22 @@ def graph_cl_pretrain(
             else:               
                 zi, hi = model(batch1.to(device))   # zi是10个ReadOut操作之后的图向量，  hi是 batch1中的10个图的所有节点的  GNN聚合后的节点特征，
                 zj, hj = model(batch2.to(device))
-                ########################  目前学到了这里
+                                                    
+                                                    
+                                                    #   batch1.x是 没经过GNN的原始特征， hi是经过GNN之后的节点特征
                 loss = loss_fn(zi, zj) + reconstruct*(rec_loss_fn(batch1.x, hi) + rec_loss_fn(batch2.x, hj))
+                #   loss_fn是对比LOSS，目的是希望 正例之间相似度高，负例之间相似度低，这样对比LOSS就会更小
+                #   rec_loss_fn是重构LOSS，目的是希望GNN更新后的特征  和  原始节点特征  的差距更小（保留更多的原始信息），这样LOSS会更小。
                 
             loss.backward()
-            optimizer.step()
+            optimizer.step()    #   更新GNN参数，协调器向量，更新rec_loss的decoder
             
             loss_metric.update(loss.item(), batch1.size(0))
             pbar.set_description(f'Epoch {e}, Loss {loss_metric.compute():.4f}', refresh=True)
+
+
+
+############    目前学到了这里
 
         if(gco_model!=None):
             data  = update_graph_list_param(last_updated_data, gco_model)
