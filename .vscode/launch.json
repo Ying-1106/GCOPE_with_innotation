@@ -1,28 +1,57 @@
 
 
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//       {
+//         "name": "Python: exec.py with different target datasets",
+//         "type": "python",
+//         "request": "launch",
+//         "program": "C:\\Users\\Administrator\\Desktop\\GCOPE_with_innotation\\src\\exec.py",
+//         "args": [
+//           "--config-file", "C:\\Users\\Administrator\\Desktop\\GCOPE_with_innotation\\pretrain.json",
+
+//           "--general.save_dir", "storage/fagcn/reconstruct",
+//           "--general.reconstruct", "0.2",
+
+//           "--data.name", "cora,citeseer,cornell",
+//           "--pretrain.split_method", "RandomWalk",
+          
+//           "--model.backbone.model_type", "fagcn"
+//         ],
+//         "console": "integratedTerminal",
+//         "justMyCode": false
+//       }
+//     ]
+//   }
+  
+
 
 {
-    "version": "0.2.0",
-    "configurations": [
+  "version": "0.2.0",
+  "configurations": [
       {
-        "name": "Python: exec.py with different target datasets",
-        "type": "python",
-        "request": "launch",
-        "program": "C:\\Users\\Administrator\\Desktop\\GCOPE_with_innotation\\src\\exec.py",
-        "args": [
-          "--config-file", "C:\\Users\\Administrator\\Desktop\\GCOPE_with_innotation\\pretrain.json",
-
-          "--general.save_dir", "storage/fagcn/reconstruct",
-          "--general.reconstruct", "0.2",
-
-          "--data.name", "cora,citeseer,cornell",
-          "--pretrain.split_method", "RandomWalk",
-          
-          "--model.backbone.model_type", "fagcn"
-        ],
-        "console": "integratedTerminal",
-        "justMyCode": false
+          "name": "Python: exec.py with adapt function and fine-tuning",
+          "type": "python",
+          "request": "launch",
+          "program": "C:\\Users\\Administrator\\Desktop\\GCOPE_with_innotation\\src\\exec.py",
+          "args": [
+              "--general.func", "adapt",
+              "--general.save_dir", "storage/fagcn/balanced_few_shot_fine_tune_backbone_with_rec",
+              "--general.few_shot", "1",
+              "--general.reconstruct", "0.0",
+              "--data.node_feature_dim", "100",
+              "--data.name", "photo",
+              "--adapt.method", "finetune",
+              "--model.backbone.model_type", "fagcn",
+              "--model.saliency.model_type", "none",
+              "--adapt.pretrained_file", "storage/fagcn/reconstruct/cora,citeseer,cornell_pretrained_model.pt",
+              "--adapt.finetune.learning_rate", "1e-2",
+              "--adapt.batch_size", "100",
+              "--adapt.finetune.backbone_tuning", "1"
+          ],
+          "console": "integratedTerminal",
+          "justMyCode": false
       }
-    ]
-  }
-  
+  ]
+}

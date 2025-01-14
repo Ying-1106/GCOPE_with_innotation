@@ -28,10 +28,10 @@ def x_svd(data, out_dim):
 
 @param('general.cache_dir')
 def iterate_datasets(data_names, cache_dir):
-    #   dataset是["cora","citeseer"]
+    #   dataset是["cora","citeseer","cornell"]
     if isinstance(data_names, str):
         data_names = [data_names]
-    #   dataset是["cora","citeseer"]
+    #   dataset是["cora","citeseer","cornell"]
     for data_name in data_names:
         if data_name in ['cora', 'citeseer', 'pubmed']:
             data = Planetoid(root=cache_dir, name=data_name.capitalize())._data

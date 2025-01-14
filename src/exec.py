@@ -6,14 +6,14 @@ import argparse
 import os
 
 
-
+#   我在json文件中给出的参数值都是 字符串""，所以要在Section内部规定这些参数名应该有的参数值的类型
 Section(ns = 'general', desc ='General Configs').params(
 
     #   required = True表示必须命令行提供这个参数的参数值
     func = Param(OneOf(['pretrain', 'adapt', 'ete']), required=True),
-
+    #   .cache用于存储  数据集
     cache_dir = Param(Folder(True), default='storage/.cache'),
-
+    #   save_dir用于保存预训练好的模型，默认值是  storage/fagcn/reconstruct
     save_dir = Param(Folder(True), default=f'storage/tmp',required=True),
     seed = Param(int, default=777, desc='seed for general randomness'),
     few_shot = Param(int, default=1, desc='few-shot node classification'),
