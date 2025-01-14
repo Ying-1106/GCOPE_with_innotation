@@ -40,11 +40,11 @@ def run(
         # load data
         from data import get_clustered_data
 
-        with torch.no_grad():   #   dataset是["cora","citeseer"]
+        with torch.no_grad():   #   dataset是["cora","citeseer","corness"]
            
-        #   data是  若干个  诱导子图 （从大图中采样得来的）构成的列表
+        #   data是  622个  诱导子图 （从大图中采样得来的）构成的列表
         #   gco_model.learnable_param  是  所有协调器节点的向量
-        #   raw_data是  大图（包含协调器节点，和与协调器有关的边）。 raw_data.x[-3（或者-2,-1）]就是最后3个节点向量，也就是3个协调器向量
+        #   raw_data是  大图（包含协调器节点，和与协调器有关的边）。 raw_data.x[-3,-2,-1]就是最后3个节点向量，也就是3个协调器向量
             data, gco_model, raw_data = get_clustered_data(dataset)  #   raw_data.x包含6221个节点向量，最后3个向量  和 gco_model.learnable_param是相同的。都是代表3个协调器向量
 
         # init model
@@ -248,8 +248,11 @@ def graph_cl_pretrain(
     from data.contrastive import update_graph_list_param    
     loss_metric = MeanMetric()
 
+
+
     for e in range(epoch):
         
+        #   在每个epoch中，last_updated_data （622个诱导子图，包含协调器节点）  和   gco_model.last_param（3个协调器  在本回合开始的初始值）  都是保持不变的
         loss_metric.reset()
 
         if(cross_link > 0 and cl_init_method == 'learnable'):
@@ -257,6 +260,8 @@ def graph_cl_pretrain(
                 last_updated_data = deepcopy(data)  #   data： 622个诱导子图构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
 
             loaders = get_loaders(data) #   data： 622个诱导子图构成的列表
+
+
         elif(e==0):
             loaders = get_loaders(data)
 
@@ -265,7 +270,7 @@ def graph_cl_pretrain(
         for batch1, batch2 in pbar:
             #   batch1包含10个  删节点增强后的图  ，batch2包含10个  删除边增强后的图
             #   上一个batch1，batch2 会在最后更新 协调器，下面这个操作就是把  更新后的协调器向量  赋值  给 这个batch中的协调器。（相当于让这一个batch的协调器也得到更新）
-            if(gco_model!=None):    #   以下这个操作，是把batch中的协调器向量  从不可改变的固定向量  变成  可学习的向量
+            if(gco_model!=None):    #   以下这个操作，是把batch中的协调器向量  从不可改变的固定向量  变成  可学习的向量（协调器最新值）。
                 batch1 = gco_model(batch1)  #   一个batch1包含10个图，batch1.batch取值为0~9，标明了属于10张图中的哪一个
                 batch2 = gco_model(batch2)    
 
@@ -275,7 +280,7 @@ def graph_cl_pretrain(
                 zi, zj = model(batch1.to(device)), model(batch2.to(device))
                 loss = loss_fn(zi, zj)
             else:               
-                zi, hi = model(batch1.to(device))   # zi是10个ReadOut操作之后的图向量，  hi是 batch1中的10个图的所有节点的  GNN聚合后的节点特征，
+                zi, hi = model(batch1.to(device))   # zi是10个ReadOut操作之后的图向量，  hi是 batch1中的10个图的  所有节点  经过GNN聚合后的节点特征，
                 zj, hj = model(batch2.to(device))
                                                     
                                                     
@@ -284,24 +289,28 @@ def graph_cl_pretrain(
                 #   loss_fn是对比LOSS，目的是希望 正例之间相似度高，负例之间相似度低，这样对比LOSS就会更小
                 #   rec_loss_fn是重构LOSS，目的是希望GNN更新后的特征  和  原始节点特征  的差距更小（保留更多的原始信息），这样LOSS会更小。
                 
-            loss.backward()
-            optimizer.step()    #   更新GNN参数，协调器向量，更新rec_loss的decoder
+            loss.backward()     #   每个batch都有一个LOSS
+            optimizer.step()    #   更新GNN参数（model），更新协调器向量（gco_model)，更新rec_loss的decoder
             
-            loss_metric.update(loss.item(), batch1.size(0))
+            loss_metric.update(loss.item(), batch1.size(0)) #   loss_metric会把 每个batch的loss都集合起来，最后loss_metric.compute()会返回一个平均值
             pbar.set_description(f'Epoch {e}, Loss {loss_metric.compute():.4f}', refresh=True)
 
 
 
-############    目前学到了这里
+
 
         if(gco_model!=None):
-            data  = update_graph_list_param(last_updated_data, gco_model)
+            #   这个阶段 last_updated_data （622个诱导子图）中的协调器   和  gco_model.last_param是一样的
+            #   以下这个函数的作用是，更新 622个诱导子图中  协调器的值，  返回的data（包含622个诱导子图）是  协调器更新后的  诱导子图
+            data  = update_graph_list_param(last_updated_data, gco_model)   
+
+            #   把last_pram这三个协调器  也更新成最新值
             gco_model.update_last_params()
 
         # lr_scheduler.step()
         
         if(loss_metric.compute()<best_loss):
-            best_loss = loss_metric.compute()
+            best_loss = loss_metric.compute()   #   这是本epoch内，所有batch的loss的平均值。作为本轮（本epoch）的LOSS
             best_model = deepcopy(model)
             
         pbar.close()

@@ -45,6 +45,7 @@ class GraphCoordinator(nn.Module):
         return batch_with_learnable_param
 
     def update_last_params(self):
+    #   把更新后的协调器   赋值给  last_param这3个协调器（这3个协调器在每个epoch过程中保持不变，只会在本轮epoch的最后得到更新）
         self.last_updated_param = [deepcopy(param.data) for param in self.learnable_param]
 
 if __name__ == '__main__':

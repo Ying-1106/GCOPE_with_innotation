@@ -268,20 +268,24 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
 
         print(f"Total {len(graph_list)} subgraphs with nodes more than 5, and there are {skip_num} skipped subgraphs with nodes less than 5.")
 
-        #   graph_list是  若干个  诱导子图
+        #   graph_list是  622个  诱导子图
         #   gco_model.learnable_param就是  所有协调器节点的向量
         #   raw_data是  大图（包含协调器节点，和与协调器有关的边）
         return graph_list, gco_model, raw_data  #   raw_data.x包含6221个节点向量，最后3个向量  和 gco_model.learnable_param是相同的。都是代表3个协调器向量
 
 def update_graph_list_param(graph_list, gco_model):
-    
+    #   graph_list是622个诱导子图，  gco_model是3个协调器，这个函数的作用是  更新所有诱导子图中的协调器的值。（gco_model.last_param这是这一轮epoch中固定不变的协调器的值）
+    #   而graph_list
     count = 0
-    for graph_index, graph in enumerate(graph_list):
+    for graph_index, graph in enumerate(graph_list):    #   graph_list是 622个诱导子图（可能包含协调器节点）
+
         for index, param_value in enumerate(gco_model.last_updated_param):
+
             match_info = torch.where(graph.x==param_value)
+
             if(match_info[0].shape[0]!=0):
-                target_node_indice = match_info[0].unique()[-1].item()
-                graph.x[target_node_indice] = gco_model.learnable_param[index].data
+                target_node_indice = match_info[0].unique()[-1].item()  #   target_node_indice == 22,就表示 ，这个子图中的 22号节点 就是协调器
+                graph.x[target_node_indice] = gco_model.learnable_param[index].data #   更新这个协调器的值
                 count+=1
     updated_graph_list = graph_list
     return updated_graph_list    
