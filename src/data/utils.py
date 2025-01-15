@@ -26,9 +26,12 @@ def x_svd(data, out_dim):
     return reduction(data)
 
 
+
+#   这个函数会返回一个 迭代器，包含多个 Pyg.Data（比如cora,citeseer等）
 @param('general.cache_dir')
 def iterate_datasets(data_names, cache_dir):
-    #   dataset是["cora","citeseer","cornell"]
+    #   预训练阶段 dataset是 ["cora","citeseer","cornell"]
+    #   下游阶段  dataset 是 "phote"
     if isinstance(data_names, str):
         data_names = [data_names]
     #   dataset是["cora","citeseer","cornell"]
@@ -79,10 +82,10 @@ def iterate_dataset_feature_tokens(data_names, cache_dir):
 
 
 
-# including projection operation, SVD
+# including projection operation, SVD。  这个函数是  把给定的Pyg.Data（一个graph），删除mask，并且节点特征维度统一到100
 @param('data.node_feature_dim')
 def preprocess(data, node_feature_dim):
-    
+    #   比如data是  photo数据集 ，节点特征[7650,745]，  edge_index:[2,238162]
     #   删除train_mask等，因为预训练不需要label，自然也就不需要用train_mask来划分训练节点等，预训练是自监督
     if hasattr(data, 'train_mask'):
         del data.train_mask

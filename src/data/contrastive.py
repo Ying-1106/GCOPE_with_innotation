@@ -12,7 +12,7 @@ import numpy as np
 @param('pretrain.dynamic_prune')
 @param('pretrain.split_method')
 def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable', cross_link_ablation=False, dynamic_edge='none',dynamic_prune=0.0,split_method='RandomWalk'):
-    
+    #   这个get_clustered_data的作用：将多个graph构成一个大图，并且加入协调器节点和与协调器相连的边。之后在这个大图（包含协调器）上，通过随机游走，生成了 622个诱导子图（包含协调器）
 
     #################              实验代码，
     #   测试结论：iterate_datasets（dataset)函数，会返回一个可迭代的generator，这个generator有2种访问方式:
@@ -47,11 +47,13 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
     #   data_list[2]  是  Cornell 数据集 , 节点 ： [183,100]，边 ：[2,298]
 ########################################################################################################
     from torch_geometric.data import Batch  #   
-    data = Batch.from_data_list(data_list)  #   把 多个graph  合并  成一个大图（各个子图之间没有连接）。（具体：把多个pyg.Data  构造成  一个pyg.Batch对象P)
+    data = Batch.from_data_list(data_list)  #   把 多个graph  合并  成一个大图（各个子图之间没有连接）。（具体：把多个pyg.Data  构造成  一个pyg.Batch对象)
     #   构造后的data  是一个  pyg.batch(大图)，节点特征 x :[16460,100] , edge_index（边） 是：[2 , 502278] 
-    #   此时的节点数等于两个小图节点个数之和，边数等于2个小图的边数量之和。（可以看出，此时这个大图还不包含协调器，也不存在和协调器连接的边）
-    #   data.batch是一个 [0,0,......,1,1.....]  :  16460个元素，前2708个是0（表示cora的节点），后13752个是1（表示computers的节点）
-    
+    #   此时的节点数等于3个小图节点个数之和，边数等于3个小图的边数量之和。（可以看出，此时这个大图还不包含协调器，也不存在和协调器连接的边）
+    #   data.batch是一个 [0,0,......,1,1.....，2,2....]  :  6218个元素，batch中是0表示cora的节点，1表示citeseer节点，2表示cornell节点
+    #   这个Batch.from_data_list()操作，是把多个图构造成一个大图（不含协调器）：data
+
+
     from copy import deepcopy
     data_for_similarity_computation = deepcopy(data)
     print(f'Isolated graphs have total {data.num_nodes} nodes, each dataset added {cross_link} graph coordinators')
@@ -99,13 +101,13 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
             #   因为设置了seed，所以每次跑代码，生成的协调器向量初始值都是一样的
             gco_model = GraphCoordinator(data.num_node_features,len(new_index_list))
 
-            #   data是一个 Pyg.Batch（大图）， data.x包含了2个小图的全部节点特征。
-            #   把2个协调器节点特征 加入到 原有的data.x当中。
+            #   data是一个 Pyg.Batch（大图）， data.x包含了3个小图的全部节点特征。
+            #   把3个协调器节点特征 加入到 原有的data.x当中。
             
             data.x = gco_model.add_learnable_features_with_no_grad(data.x)
             #   处理后的  data.x  是  6221 * 100的 节点特征。（所有 原始小图 节点特征 + k个协调器节点特征）
             #   Cora,Citeseer,Corenell三个原始图  节点总数加起来  6218. （不包含协调器），加上3个协调器共有6221个节点
-      
+            #   这个操作就是，把3个协调器加入到大图节点特征中
 
 
         #   原来的data.batch是一个 [0,0,......,1,1.....,2,2]。6218个元素，
@@ -118,7 +120,7 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
         #   处理之后的data.batch在最后加了个[0,1,2]，代表： cora图的协调器节点， citeseer图的协调器节点,cornell图的协调器节点
 
 
-        
+        #   把与协调器有关的边 ，加入到大图data中
         if(dynamic_edge=='none'):
 
         #   给大图data加入新的边：每个协调器节点  和  对应的小图原始节点都有  来、回2条边
@@ -234,6 +236,7 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
 
     print(f'Unified graph has {data.num_nodes} nodes, each graph includes {cross_link} graph coordinators')
 
+    #   这个data和raw_data就是  大图（包含3个原始图，以及协调器节点，和与协调器相连的边）
     raw_data = deepcopy(data)
 
 
@@ -262,16 +265,18 @@ def get_clustered_data(dataset, cache_dir, cross_link, cl_init_method='learnable
                 skip_num+=1
                 continue
             #   data是 1个 大图（包含协调器  和 与协调器有关的边）
-            subgraph_data = data.subgraph(subgraph_nodes)   # 用这些节点ID ，从大图中构造一个诱导子图：诱导子图中的节点是上述节点，边是  两端点都是上述节点的边
+            subgraph_data = data.subgraph(subgraph_nodes)   # 用这些节点ID ，从大图中构造一个【诱导子图】，诱导子图中的节点是：上述节点，边是：两端点都是上述节点的边
 
             graph_list.append(subgraph_data)
 
         print(f"Total {len(graph_list)} subgraphs with nodes more than 5, and there are {skip_num} skipped subgraphs with nodes less than 5.")
 
-        #   graph_list是  622个  诱导子图
+        #   graph_list是  622个  诱导子图（包含协调器节点）
         #   gco_model.learnable_param就是  所有协调器节点的向量
         #   raw_data是  大图（包含协调器节点，和与协调器有关的边）
         return graph_list, gco_model, raw_data  #   raw_data.x包含6221个节点向量，最后3个向量  和 gco_model.learnable_param是相同的。都是代表3个协调器向量
+
+
 
 def update_graph_list_param(graph_list, gco_model):
     #   graph_list是622个诱导子图，  gco_model是3个协调器，这个函数的作用是  更新所有诱导子图中的协调器的值。（gco_model.last_param这是这一轮epoch中固定不变的协调器的值）

@@ -46,6 +46,10 @@ def run(
         #   gco_model.learnable_param  是  所有协调器节点的向量
         #   raw_data是  大图（包含协调器节点，和与协调器有关的边）。 raw_data.x[-3,-2,-1]就是最后3个节点向量，也就是3个协调器向量
             data, gco_model, raw_data = get_clustered_data(dataset)  #   raw_data.x包含6221个节点向量，最后3个向量  和 gco_model.learnable_param是相同的。都是代表3个协调器向量
+#   这个get_clustered_data的作用：将多个graph构成一个大图，并且加入协调器节点和与协调器相连的边。之后在这个大图（包含协调器）上，通过随机游走，生成了 622个诱导子图（包含协调器）
+
+
+
 
         # init model
         from model import get_model
@@ -64,7 +68,7 @@ def run(
 
     # train
     if method == 'graphcl':            
-        #   data： 622个诱导子图构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
+        #   data： 622个诱导子图（包含协调器）构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
         #   model.backbone 就是一个 2层的 FAGCN
         #   geo_model.learnable_param就是一个列表[],包含3个协调器节点向量
         #   raw_data是大图（包含协调器节点，和与协调器相连的边）
@@ -77,6 +81,7 @@ def run(
     # save
     import os
 
+    #   预训练阶段  的save_dir（"storage/fagcn/reconstruct"）  是用来保存预训练好的模型的
     torch.save(model.state_dict(), os.path.join(save_dir, ','.join(dataset)+'_pretrained_model.pt'))
 
 
@@ -109,7 +114,7 @@ def graph_cl_pretrain(
     
     @param('pretrain.batch_size')
     def get_loaders(data, batch_size):
-        #       data： 622个诱导子图构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
+        #       data： 622个诱导子图（包含协调器）构成的列表，每个data[k]是一个 databatch，例如：节点特征[23,100]，边[2,72]
         import random
         from torch_geometric.data import Data
         from torch_geometric.loader import DataLoader
@@ -287,7 +292,7 @@ def graph_cl_pretrain(
                                                     #   batch1.x是 没经过GNN的原始特征， hi是经过GNN之后的节点特征
                 loss = loss_fn(zi, zj) + reconstruct*(rec_loss_fn(batch1.x, hi) + rec_loss_fn(batch2.x, hj))
                 #   loss_fn是对比LOSS，目的是希望 正例之间相似度高，负例之间相似度低，这样对比LOSS就会更小
-                #   rec_loss_fn是重构LOSS，目的是希望GNN更新后的特征  和  原始节点特征  的差距更小（保留更多的原始信息），这样LOSS会更小。
+                #   rec_loss_fn是重构LOSS，目的是希望  GNN更新后的节点特征  和  原始节点特征  的差距更小（保留更多的原始信息），这样LOSS会更小。
                 
             loss.backward()     #   每个batch都有一个LOSS
             optimizer.step()    #   更新GNN参数（model），更新协调器向量（gco_model)，更新rec_loss的decoder

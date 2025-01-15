@@ -14,22 +14,26 @@ import torch
 @param('general.save_dir')
 @param('adapt.repeat_times')
 def run(
-    dataset,
-    batch_size,
-    ratios,
-    method,
-    backbone_model,
-    saliency_model,
-    answering_model,
-    pretrained_file,
+    dataset,    #   "photo"，下游任务阶段，只用1个graph
+    batch_size, # 100
+    ratios, #       0.1， 0.1 ， 0.8 这是训练集、验证集、测试集的划分
+    method, #   一般是finetune
+    backbone_model, #   fagcn
+    saliency_model, #   none
+    answering_model,    #   mlp，是一个2层MLP
+    pretrained_file,    #   预训练好的 GNN模型的 存放位置
     save_dir,
-    repeat_times,
+    repeat_times,   #   5
     ):
     
     # load data
     from data import get_supervised_data
     from torch_geometric.loader import DataLoader
+
+
     datasets, num_classes = get_supervised_data(dataset[0], ratios=ratios)
+
+    
     loaders = { k: DataLoader(v, batch_size=batch_size, shuffle=True, num_workers=4) for k, v in datasets.items() }
 
     # init model
