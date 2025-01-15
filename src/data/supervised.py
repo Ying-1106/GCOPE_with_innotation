@@ -12,7 +12,9 @@ def induced_graphs(data, smallest_size=10, largest_size=30):
     induced_graph_list = []
     total_node_num = data.x.size(0) #   data的节点总数
 
-    for index in range(data.x.size(0)): # index表示每一个  节点ID
+    for index in range(data.x.size(0)): 
+        # index表示每一个  节点ID
+
         current_label = data.y[index].item()    #   当前index节点 的 label
 
         current_hop = 2 #   跳数
@@ -58,7 +60,10 @@ def induced_graphs(data, smallest_size=10, largest_size=30):
 @param('general.cache_dir')
 @param('general.few_shot')
 def get_supervised_data(dataset, ratios, seed, cache_dir,few_shot):
-    #   dataset  是 "photo"，表示下游阶段的数据集。ratios是[0.1,0.1,0.8]是训练、验证、测试的划分。cache_dir是存数据集的位置
+    #   dataset  是 "photo"，表示下游阶段的数据集。
+    #   ratios是[0.1,0.1,0.8]是训练、验证、测试的划分。
+    #   cache_dir是存数据集的位置
+    #   ratios只有在few_shot == 0的时候才用到。我们设定few_shot == 1，所以用不到ratios
     import os
     cache_dir = os.path.join(cache_dir, dataset)    #   返回值是 storage/.cache/photo
     os.makedirs(cache_dir, exist_ok=True)
@@ -82,7 +87,8 @@ def get_supervised_data(dataset, ratios, seed, cache_dir,few_shot):
         from torch.utils.data import random_split
         train_set, val_set, test_set = random_split(target_graph_list, ratios, torch.Generator().manual_seed(seed))
 
-    else:   #   storage/cache/photo 目录下， 创建一个  few_shot_seed.pt文件。 （.pt文件是用来保存 torch模型参数的文件）
+    else:   #   storage/cache/photo 目录下， 创建一个  few_shot_seed.pt文件。 （.pt文件是用来保存 torch模型参数  的文件）
+        #   在本代码中，cache_path保存的是下游任务阶段的数据集，包括train_set（8个子图，每个类别1个子图）,val_set（765个子图）,test_set（6877个子图），以及num_classes==8（8分类的节点分类问题）
         cache_path = os.path.join(cache_dir + f'/{few_shot}_shot' + f'_s{seed}' + '.pt')
 
         if os.path.exists(cache_path):
@@ -109,24 +115,37 @@ def get_supervised_data(dataset, ratios, seed, cache_dir,few_shot):
         target_graph_list = induced_graphs(data)    #   data(photo数据集)包含7650个节点，生成7650个诱导子图。（每个节点都生成一个以该节点为中心的诱导子图）
 
 
-############################        目前学到了这里
+
         from torch.utils.data import random_split, Subset
 
         for index, graph in enumerate(target_graph_list):
-            
-            i_class = graph.y
+            #   index是诱导子图的ID，其实本质上是 photo数据集中每一个节点的ID。而graph就是以这个节点为中心的诱导子图
+            i_class = graph.y   #   y就是这个子图中心节点的  类别标签
 
             if( len(train_dict_list[i_class]) >= few_shot):
                 val_test_list.append(graph)
             else:
                 train_dict_list[i_class].append(index)
-        
+        #   此时，train_dict_list代表的是：每个类别，都有1个该类别的节点的诱导子图（存着这个诱导子图的中心节点ID）。因为few_shot == 1，所以每个类别都只有 1个子图作为训练集
+        #   而val_test_list保存了除了训练集之外其余的所有诱导子图        
+                
+
+
         all_indices = []
         for i_class, indice_list in train_dict_list.items():
             all_indices+=indice_list
+        #   此时all_indices 包含8个 节点ID，分别是训练集中，0号类别到7号类别的，诱导子图中心节点ID
+            
 
-        train_set = Subset(target_graph_list, all_indices)
 
+
+        train_set = Subset(target_graph_list, all_indices)  #   train_set包含8个子图，就是8个类别，每个类别一个子图
+
+
+        #   整个photo数据集，一共7650个节点，构造了7650个子图
+        #   其中train_set训练集包含了8个子图，每个类别1个子图
+        #   剩下的7642个子图，按照 1 比 9的比例分配给val_set和test_set
+        #   分配结果是，val_set有765个子图， test_set有6877个子图
         val_set, test_set = random_split(val_test_list, [0.1,0.9], torch.Generator().manual_seed(seed))
         
 
@@ -134,7 +153,7 @@ def get_supervised_data(dataset, ratios, seed, cache_dir,few_shot):
     # import pdb
     # pdb.set_trace()
 
-    results = [
+    results = [     #   这个就是下游阶段，所有的数据数据集
     {
         'train': train_set,
         'val': val_set,
