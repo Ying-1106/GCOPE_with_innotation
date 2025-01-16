@@ -37,7 +37,7 @@ def run(
     datasets, num_classes = get_supervised_data(dataset[0], ratios=ratios)
 
 
-    ##############      目前学到了这里,batch_size == 100。 datasets包括 train：8个图，val:765个图，test:6877个图
+    #           batch_size == 100。 datasets包括 train：8个图，val:765个图，test:6877个图
     loaders = { k: DataLoader(v, batch_size=batch_size, shuffle=True, num_workers=4) for k, v in datasets.items() }
     #   k   :  v
     #   "train" : 8个图，
@@ -64,7 +64,7 @@ def run(
 
 
     #   取出预训练好的模型
-    model.load_state_dict(torch.load(pretrained_file,map_location=lambda storage, loc: storage.cuda(1)), strict=False)
+    model.load_state_dict(torch.load(pretrained_file,map_location=lambda storage, loc: storage.cuda(0)), strict=False)
 
     # train
     all_results = []
@@ -174,7 +174,7 @@ def finetune(
         model.eval()
 #######         目前学到这里
         pbar = tqdm(loaders['val'], total=len(loaders['val']), ncols=100, desc=f'Epoch {e} Validation, Acc: 0., F1: 0.')
-        with torch.no_grad():
+        with torch.no_grad():   #   有梯度 就代表要更新模型参数。没有梯度就代表不会更新模型参数
             for batch in pbar:
                 batch = batch.to(device)
                 pred = model(batch).argmax(dim=-1)
