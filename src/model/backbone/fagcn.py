@@ -36,14 +36,14 @@ class FAGCN(torch.nn.Module):
         raw = h #   raw是初始特征经过一层Linear层变换后的  长度为128的特征（相当于 没经过GNN的初始特征）
 
 
-        for i in range(self.layer_num): #   这是经过 多层GNN聚合，得到更新后的节点特征 h 
+        for i in range(self.layer_num): #   这是经过 多层GNN聚合，得到更新后的  节点特征 h 
             h = self.layers[i](h, raw, edge_index)
         h = self.t2(h)
 
         #   这就是ReadOut操作，这里有10个图，得到每个图的  图向量。
         graph_emb = self.global_pool(h, batch)
 
-        if(reconstruct==0.0):
+        if(reconstruct==0.0):   #   reconstruct == 0，这是下游微调阶段，这一阶段只需要把子图向量返回
             return graph_emb
         else:   # 返回多层GNN聚合后的节点特征 h  ， 以及ReadOut操作之后的 图向量
             return graph_emb, h

@@ -30,14 +30,20 @@ def run(
     from data import get_supervised_data
     from torch_geometric.loader import DataLoader
 
-    #   get_supervised_data("photo",ratios = [0.1,0.1,0.8])的作用
+    #   get_supervised_data("photo",ratios = [0.1,0.1,0.8])   的作用
     #   首先下载到photo数据集（一共7650个节点），给每个节点都以它为中心构造一个诱导子图，一共7650个诱导子图
     #   然后，训练集中：每个类别，有一个对应的诱导子图（子图的中心节点就属于该类别，这是一个节点分类问题）
     #   剩下的7642个子图，按照1比9的比例，分配给val_set（765个子图）和test_set（6877个子图）
     datasets, num_classes = get_supervised_data(dataset[0], ratios=ratios)
 
-    ##############      目前学到了这里
+
+    ##############      目前学到了这里,batch_size == 100。 datasets包括 train：8个图，val:765个图，test:6877个图
     loaders = { k: DataLoader(v, batch_size=batch_size, shuffle=True, num_workers=4) for k, v in datasets.items() }
+    #   k   :  v
+    #   "train" : 8个图，
+    #   "val" : 765个图，每个batch包含100个图，
+    #   "test" : 6877个图，每个batch包含100个图
+
 
     # init model
     from model import get_model
@@ -47,8 +53,8 @@ def run(
             'num_features': datasets['train'][0].x.size(-1),
         },
         answering_kwargs = {
-            'name': answering_model,
-            'num_class': num_classes,
+            'name': answering_model,    #   MLP
+            'num_class': num_classes,   #   8，表示8分类问题，也是MLP最后输出的大小
         },
         saliency_kwargs = {
             'name': saliency_model,
@@ -56,6 +62,8 @@ def run(
         } if saliency_model != 'none' else None,
     )
 
+
+    #   取出预训练好的模型
     model.load_state_dict(torch.load(pretrained_file,map_location=lambda storage, loc: storage.cuda(1)), strict=False)
 
     # train
@@ -115,13 +123,13 @@ def finetune(
         epoch,
         ):
 
-    model.backbone.requires_grad_(backbone_tuning)
+    model.backbone.requires_grad_(backbone_tuning)  #   表示backbone（2层GNN）是会在下游阶段不断更新的
     model.saliency.requires_grad_(saliency_tuning)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()),
+        filter(lambda p: p.requires_grad, model.parameters()),  #   下游阶段要更新的是  GNN  和  2层MLP（answering)
         lr = learning_rate,
         weight_decay = weight_decay,
         )
@@ -146,22 +154,25 @@ def finetune(
         f1_metric.reset()
         auroc_metric.reset()
 
+
+
+        #   首先是 train_set，一共8个图（加起来220个节点），因为一个batch包含100个图，所以训练集只有一个batch
         pbar = tqdm(loaders['train'], total=len(loaders['train']), ncols=100, desc=f'Epoch {e} Training, Loss: inf')
 
         for batch in pbar:
-            optimizer.zero_grad()
+            optimizer.zero_grad()   #   这个循环只会执行一次，因为训练集一共就一个batch（包含8个图，加起来220个节点）
             batch = batch.to(device)
-            pred = model(batch)
-            loss = torch.nn.functional.cross_entropy(pred, batch.y)
-            loss.backward()
-            optimizer.step()
+            pred = model(batch) #   这里的pred是每个图 的预测值（长度为8的向量，表示8个类别的预测值，可以是负数）
+            loss = torch.nn.functional.cross_entropy(pred, batch.y) #   每个图的预测值向量  先经过softmax得到预测概率（8个类别的概率的和为1），然后取正确类别的概率的 -ln值，这样正确类别的预测概率越大，其他类别的预测概率越小，LOSS值就越小
+            loss.backward() #   LOSS对 参数求梯度
+            optimizer.step()    #   更新参数，更新GNN参数（backbone)  和  下游任务头（2层MLP）
 
             loss_metric.update(loss.detach(), batch.size(0))
             pbar.set_description(f'Epoch {e} Training Loss: {loss_metric.compute():.4f}', refresh=True)
         pbar.close()
 
         model.eval()
-
+#######         目前学到这里
         pbar = tqdm(loaders['val'], total=len(loaders['val']), ncols=100, desc=f'Epoch {e} Validation, Acc: 0., F1: 0.')
         with torch.no_grad():
             for batch in pbar:
