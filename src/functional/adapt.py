@@ -146,7 +146,13 @@ def finetune(
     best_acc = 0.
     best_model = None
 
-    for e in range(epoch):
+    for e in range(epoch):  
+        #   每一个epoch（每一轮），都包括  训练  和  验证。训练就是更新模型，验证就是计算一下模型的预测效果
+        #   训练过程  会 更新模型
+        #   如果在验证集上的ACC优于best_acc，那么就用这一轮更新后的model来作为最优模型
+
+
+
         model.train()
 
         loss_metric.reset()
@@ -154,7 +160,7 @@ def finetune(
         f1_metric.reset()
         auroc_metric.reset()
 
-
+        #       这一轮的训练
 
         #   首先是 train_set，一共8个图（加起来220个节点），因为一个batch包含100个图，所以训练集只有一个batch
         pbar = tqdm(loaders['train'], total=len(loaders['train']), ncols=100, desc=f'Epoch {e} Training, Loss: inf')
@@ -171,15 +177,19 @@ def finetune(
             pbar.set_description(f'Epoch {e} Training Loss: {loss_metric.compute():.4f}', refresh=True)
         pbar.close()
 
+
+        ###     这一轮的验证
+
+
         model.eval()
-#######         目前学到这里
+        
         pbar = tqdm(loaders['val'], total=len(loaders['val']), ncols=100, desc=f'Epoch {e} Validation, Acc: 0., F1: 0.')
         with torch.no_grad():   #   有梯度 就代表要更新模型参数。没有梯度就代表不会更新模型参数
             for batch in pbar:
                 batch = batch.to(device)
-                pred = model(batch).argmax(dim=-1)
+                pred = model(batch).argmax(dim=-1)  #   预测类别
 
-                acc_metric.update(pred, batch.y)
+                acc_metric.update(pred, batch.y)    #   预测类别pred  和  真实类别标签y  ，计算出ACC（预测准确率）
                 f1_metric.update(pred, batch.y)
                 auroc_metric.update(model(batch), batch.y)
                 pbar.set_description(f'Epoch {e} Validation Acc: {acc_metric.compute():.4f}, AUROC: {auroc_metric.compute():.4f}, F1: {f1_metric.compute():.4f}', refresh=True)
@@ -189,8 +199,21 @@ def finetune(
             best_acc = acc_metric.compute()
             best_model = deepcopy(model)
     
+
+
+
+
+
+
+
+    #   上述有100轮，每一轮都会有一个ACC，我们选取ACC最高的那一轮（表示那一轮的模型预测效果最好，就是在验证集上效果最好），用那一轮的模型来作为最优模型
     model = best_model if best_model is not None else model
 
+
+#####       所有100轮跑完之后，选取验证集上效果最好的一轮，用这一轮的模型来作为最优模型
+
+
+###         目前学到了这里
     # test
     model.eval()
 
