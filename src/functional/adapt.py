@@ -68,9 +68,9 @@ def run(
 
     # train
     all_results = []
-    for _ in range(repeat_times):
+    for _ in range(repeat_times):   #   一共做5次微调，这5次微调彼此之间完全独立，没有任何关联。
         if method == 'finetune':
-            results = finetune(loaders, model)
+            results = finetune(loaders, model)      #   返回的results包含 在测试集上的  ACC。代表这一次微调的结果
         elif method == 'prog':
             from model import get_prompt_model
             # statistic the average node number of dataset
@@ -85,11 +85,11 @@ def run(
             raise NotImplementedError(f'Unknown method: {method}')
         
         results.pop('model')
-        all_results.append(results)        
-
-    # print acc, auroc, f1 with std
-    import numpy as np
-    for k in all_results[0].keys():
+        all_results.append(results)        #    1次finetune其实就是完整的 预训练—微调了，返回的results可以理解为实验结果（ACC）。
+    ######                                  #   只不过由于做实验，实验结果有偶然性，所以要多做几次取一个平均值
+    # 打印 acc, auroc, f1   的平均值和标准差
+    import numpy as np      #   all_results包含了 5次独立实验的  全部结果（ACC）
+    for k in all_results[0].keys(): #   把5次独立的实验结果，求一下平均值和标准差
         print(f'{k}: {np.mean([r[k] for r in all_results]):.4f} ± {np.std([r[k] for r in all_results]):.4f}')
         
     import os
@@ -97,7 +97,7 @@ def run(
     if(method!='prog'):
         with open(os.path.join(save_dir, dataset[0]+'_results.txt'), 'a+') as f:
             f.write('-------------------------------------------------\n')
-            for k in all_results[0].keys():
+            for k in all_results[0].keys(): #   把5次实验的平均值和标准差 输出到文件中
                 f.write(method+f'FT on All, Target Dataset: {dataset[0]}, {k}: {np.mean([r[k] for r in all_results]):.4f} ± {np.std([r[k] for r in all_results]):.4f}\n')
     else:
         with open(os.path.join(save_dir, dataset[0]+'_results.txt'), 'a+') as f:
@@ -213,7 +213,7 @@ def finetune(
 #####       所有100轮跑完之后，选取验证集上效果最好的一轮，用这一轮的模型来作为最优模型
 
 
-###         目前学到了这里
+###         
     # test
     model.eval()
 
@@ -225,16 +225,16 @@ def finetune(
     with torch.no_grad():
         for batch in pbar:
             batch = batch.to(device)
-            pred = model(batch).argmax(dim=-1)
+            pred = model(batch).argmax(dim=-1)#   预测类别
 
             acc_metric.update(pred, batch.y)
             f1_metric.update(pred, batch.y)
-            auroc_metric.update(model(batch), batch.y)
+            auroc_metric.update(model(batch), batch.y)  #   以下输出的是  每一个batch的acc。
             pbar.set_description(f'Testing Acc: {acc_metric.compute():.4f}, AUROC: {auroc_metric.compute():.4f}, F1: {f1_metric.compute():.4f}', refresh=True)
         pbar.close()
     
     return {
-        'acc': acc_metric.compute().item(),
+        'acc': acc_metric.compute().item(), #   返回模型在测试集上的  ACC
         'auroc': auroc_metric.compute().item(),
         'f1': f1_metric.compute().item(),
         'model': model.state_dict(),
